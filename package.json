@@ -1,0 +1,11 @@
+{
+  "name": "riskshield-v4-hook",
+  "description": "Uniswap v4 hook for tranche-based impermanent-loss insurance using senior LP protection, junior first-loss capital, and dynamic swap premiums.",
+  "type": "module",
+  "scripts": {
+    "compile": "node tools/compile.mjs"
+  },
+  "dependencies": {
+    "solc": "^0.8.35"
+  }
+}
