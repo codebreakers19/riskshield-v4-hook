@@ -90,6 +90,19 @@ contract RiskShieldVaultTest {
         _assertEq(vault.reserveAvailable(POOL_ID), 0);
     }
 
+    function testSeniorCoverageIsCappedByMaxCoverageBps() external {
+        uint256 reserve = 10_000_000 ether;
+        usdc.mint(address(this), reserve);
+        usdc.approve(address(vault), reserve);
+        vault.depositJunior(POOL_ID, reserve);
+
+        uint256 id = vault.openSeniorPosition(POOL_ID, address(0xA11CE), 10 ether, 20_000 * USDC, 2_000 * WAD, 100);
+        (uint256 holdValue,,,) = vault.positionValues(id, 1 ether, 2_000 * USDC, 2_000 * WAD);
+        (, uint256 coverage) = vault.closeSeniorPosition(id, 1 ether, 2_000 * USDC, 2_000 * WAD);
+
+        _assertEq(coverage, (holdValue * 3_000) / 10_000);
+    }
+
     function testJuniorCapitalAbsorbsFirstLossOnlyAfterReserve() external {
         uint256 reserve = 1_000 * USDC;
         uint256 premium = 500 * USDC;
@@ -115,6 +128,61 @@ contract RiskShieldVaultTest {
 
         _assertEq(loss, 0);
         _assertEq(coverage, 0);
+    }
+
+    function testNoCompensationWhenExitBeatsHoldBenchmark() external {
+        usdc.mint(address(this), 1_000 * USDC);
+        usdc.approve(address(vault), 1_000 * USDC);
+        vault.depositJunior(POOL_ID, 1_000 * USDC);
+
+        uint256 id = vault.openSeniorPosition(POOL_ID, address(0xA11CE), 1 ether, 2_000 * USDC, 2_000 * WAD, 100);
+        (uint256 loss, uint256 coverage) = vault.closeSeniorPosition(id, 2 ether, 4_000 * USDC, 2_000 * WAD);
+
+        _assertEq(loss, 0);
+        _assertEq(coverage, 0);
+        _assertEq(vault.reserveAvailable(POOL_ID), 1_000 * USDC);
+    }
+
+    function testSeniorPositionCannotBeClosedTwice() external {
+        usdc.mint(address(this), 1_000 * USDC);
+        usdc.approve(address(vault), 1_000 * USDC);
+        vault.depositJunior(POOL_ID, 1_000 * USDC);
+
+        uint256 id = vault.openSeniorPosition(POOL_ID, address(0xA11CE), 1 ether, 2_000 * USDC, 2_000 * WAD, 100);
+        vault.closeSeniorPosition(id, 1 ether, 2_000 * USDC, 2_000 * WAD);
+
+        try vault.closeSeniorPosition(id, 1 ether, 2_000 * USDC, 2_000 * WAD) {
+            revert("closed twice");
+        } catch {}
+    }
+
+    function testCloseMySeniorPositionRequiresOwner() external {
+        uint256 id = vault.openSeniorPosition(POOL_ID, address(0xA11CE), 1 ether, 2_000 * USDC, 2_000 * WAD, 100);
+
+        UnauthorizedVaultCloser closer = new UnauthorizedVaultCloser();
+        try closer.close(vault, id) {
+            revert("non-owner closed");
+        } catch {}
+    }
+
+    function testPositionValuesPreviewMatchesCloseCoverage() external {
+        uint256 reserve = 2_000 * USDC;
+        usdc.mint(address(this), reserve);
+        usdc.approve(address(vault), reserve);
+        vault.depositJunior(POOL_ID, reserve);
+
+        uint256 id = vault.openSeniorPosition(POOL_ID, address(0xA11CE), 1 ether, 2_000 * USDC, 2_000 * WAD, 100);
+        (, , uint256 previewLoss, uint256 previewCoverage) =
+            vault.positionValues(id, 0.5 ether, 1_000 * USDC, 2_000 * WAD);
+        (uint256 loss, uint256 coverage) = vault.closeSeniorPosition(id, 0.5 ether, 1_000 * USDC, 2_000 * WAD);
+
+        _assertEq(previewLoss, loss);
+        _assertEq(previewCoverage, coverage);
+    }
+
+    function testAdminCanUpdateMaxCoverageBps() external {
+        vault.setMaxCoverageBps(5_000);
+        _assertEq(vault.maxCoverageBps(), 5_000);
     }
 
     function testPremiumAccountingCannotOverdrawReserve() external {
@@ -147,3 +215,8 @@ contract RiskShieldVaultTest {
     }
 }
 
+contract UnauthorizedVaultCloser {
+    function close(RiskShieldVault vault, uint256 id) external {
+        vault.closeMySeniorPosition(id, 1 ether, 2_000e6, 2_000e18);
+    }
+}

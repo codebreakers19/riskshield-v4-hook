@@ -75,13 +75,25 @@ contract RiskShieldHook is IHooks {
         bytes calldata hookData
     ) external onlyPoolManager returns (bytes4, BalanceDelta) {
         if (hookData.length != 0) {
-            (uint8 tranche, uint256 amount0, uint256 amount1, uint256 entryPriceWad) =
-                abi.decode(hookData, (uint8, uint256, uint256, uint256));
+            uint8 tranche;
+            address owner;
+            uint256 amount0;
+            uint256 amount1;
+            uint256 entryPriceWad;
+
+            if (hookData.length == 160) {
+                (tranche, owner, amount0, amount1, entryPriceWad) =
+                    abi.decode(hookData, (uint8, address, uint256, uint256, uint256));
+            } else {
+                (tranche, amount0, amount1, entryPriceWad) =
+                    abi.decode(hookData, (uint8, uint256, uint256, uint256));
+                owner = sender;
+            }
 
             if (tranche == TRANCHE_SENIOR) {
                 vault.openSeniorPosition(
                     PoolId.unwrap(key.toId()),
-                    sender,
+                    owner,
                     amount0,
                     amount1,
                     entryPriceWad,

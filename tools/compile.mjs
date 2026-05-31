@@ -17,13 +17,14 @@ function collectSolidityFiles(dir) {
   }
 }
 
-for (const dir of ["src", "script", "test"]) {
+for (const dir of ["src", "script"]) {
   collectSolidityFiles(path.join(root, dir));
 }
 
 function findImports(importPath) {
   const candidates = [
     path.join(root, importPath),
+    path.join(root, "lib", "forge-std", "src", importPath.replace(/^forge-std\//, "")),
     path.join(root, "..", "v4-core", importPath.replace(/^v4-core\//, "")),
   ];
 
