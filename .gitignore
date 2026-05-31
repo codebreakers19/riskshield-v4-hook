@@ -1,6 +1,7 @@
 out/
 cache/
 broadcast/
+dist/
+.playwright-mcp/
 .env
 node_modules/
-

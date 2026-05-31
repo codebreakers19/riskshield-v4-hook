@@ -3,9 +3,14 @@
   "description": "Uniswap v4 hook for tranche-based impermanent-loss insurance using senior LP protection, junior first-loss capital, and dynamic swap premiums.",
   "type": "module",
   "scripts": {
-    "compile": "node tools/compile.mjs"
+    "compile": "node tools/compile.mjs",
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
-    "solc": "^0.8.35"
+    "solc": "^0.8.35",
+    "viem": "^2.51.3",
+    "vite": "^8.0.14"
   }
 }
